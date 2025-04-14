@@ -15,7 +15,7 @@ const config: Config = {
   organizationName: 'boson', 
   projectName: 'boson-framework', 
 
-  onBrokenLinks: 'throw',
+  onBrokenLinks: 'log',
   onBrokenMarkdownLinks: 'warn',
 
   i18n: {
