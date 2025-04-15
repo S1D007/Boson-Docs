@@ -5,7 +5,7 @@ title: Installation
 
 # Installing Boson Framework
 
-This guide will help you install the Boson framework quickly and easily. Boson supports major operating systems and can be installed through package managers or built from source.
+---
 
 ## Prerequisites
 
@@ -15,39 +15,65 @@ Before installing Boson, make sure you have:
 - **CMake** 3.14 or higher
 - **OpenSSL** 1.1.1 or higher (for HTTPS support)
 
-## Installation Options
 
-### Option 1: Using Package Managers (Recommended)
+# Installing Boson CLI
 
-#### macOS
-
-```bash
-brew install boson-framework
-```
-
-#### Ubuntu/Debian
+The Boson CLI makes it easy to create, build, and run Boson C++ web projects. You can install it on macOS or Linux with a single command:
 
 ```bash
-sudo apt-add-repository ppa:boson/stable
-sudo apt update
-sudo apt install libboson-dev
+curl -fsSL https://raw.githubusercontent.com/S1D007/boson/main/install.sh | bash
 ```
 
-#### Fedora/RHEL/CentOS
+This script will:
+- Download the latest Boson CLI and framework for your platform
+- Install it to `~/.local/bin` (or another directory in your PATH)
+- Set up auto-update so you always have the latest version
+
+## Verifying Installation
+
+After installation, open a new terminal and run:
 
 ```bash
-sudo dnf install boson-devel
+boson --help
 ```
 
-### Option 2: Building from Source
+You should see the Boson CLI help output. You can also check the version:
 
-For the latest features or if your platform doesn't have a package available:
+```bash
+boson version
+```
+
+## Keeping Boson Up to Date
+
+The installer automatically sets up auto-update for the CLI. Every time you open a new shell, the CLI will check for updates and install the latest version if available.
+
+You can also update manually at any time:
+
+```bash
+boson update
+```
+
+## Uninstalling
+
+To remove the Boson CLI, simply delete the installed files:
+
+```bash
+rm -rf ~/.local/bin/boson ~/.boson
+```
+
+---
+
+This guide will help you install the Boson framework quickly and easily. Boson supports major operating systems and can be installed through package managers or built from source.
+
+## Other Installation Options
+
+For someone who wants to build it from scratch
 
 #### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/boson/boson-framework.git
-cd boson-framework
+git clone https://github.com/S1D007/boson.git
+cd boson
 ```
 
 #### Step 2: Build with CMake
@@ -106,3 +132,5 @@ cmake .. -DCMAKE_PREFIX_PATH=/path/to/boson/installation
 ## Next Steps
 
 Now that you have Boson installed, continue to the [Quick Start Guide](quickstart) to create your first Boson application.
+
+Ready to get started? [Create your first project →](./hello-world)
