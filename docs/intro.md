@@ -1,47 +1,63 @@
 ---
 sidebar_position: 1
+title: Introduction
+slug: /
 ---
 
-# Tutorial Intro
+# Introduction to Boson Framework
 
-Let's discover **Docusaurus in less than 5 minutes**.
+Boson is a modern, high-performance C++ web framework designed for building robust web applications and APIs. It combines the power and efficiency of C++ with an elegant and intuitive developer experience.
 
-## Getting Started
+## What is Boson?
 
-Get started by **creating a new site**.
+Boson is a C++17 web framework that provides:
 
-Or **try Docusaurus immediately** with **[docusaurus.new](https://docusaurus.new)**.
+- **High Performance**: Built for speed with minimal overhead
+- **Simple API**: Intuitive interfaces similar to popular web frameworks
+- **Modern C++ Design**: Leverages C++17 features for safer, cleaner code
+- **Flexibility**: Works for everything from small services to complex applications
 
-### What you'll need
+## Key Features
 
-- [Node.js](https://nodejs.org/en/download/) version 18.0 or above:
-  - When installing Node.js, you are recommended to check all checkboxes related to dependencies.
+- **Fast HTTP Server**: Built from the ground up for performance
+- **Expressive Routing**: Simple definition of application endpoints
+- **Middleware Support**: Easily extend request/response processing
+- **JSON Processing**: First-class support for JSON requests and responses
+- **Controller Architecture**: Organize related routes logically
+- **Error Handling**: Comprehensive error management
 
-## Generate a new site
+## Who Should Use Boson?
 
-Generate a new Docusaurus site using the **classic template**.
+Boson is ideal for:
 
-The classic template will automatically be added to your project after you run the command:
+- Developers building high-performance web services
+- Teams that need the efficiency of C++ with a modern API
+- Projects where low latency and resource usage are critical
+- Existing C++ codebases that need web capabilities
 
-```bash
-npm init docusaurus@latest my-website classic
+## Quick Example
+
+Here's a simple "Hello World" example in Boson:
+
+```cpp
+#include <boson/boson.hpp>
+
+int main() {
+    // Initialize the framework
+    boson::initialize();
+    
+    // Create a server
+    boson::Server app;
+    
+    // Define a route
+    app.get("/", [](const boson::Request& req, boson::Response& res) {
+        res.send("Hello, Boson!");
+    });
+    
+    // Configure and start the server
+    app.configure(3000, "127.0.0.1");
+    return app.listen();
+}
 ```
 
-You can type this command into Command Prompt, Powershell, Terminal, or any other integrated terminal of your code editor.
-
-The command also installs all necessary dependencies you need to run Docusaurus.
-
-## Start your site
-
-Run the development server:
-
-```bash
-cd my-website
-npm run start
-```
-
-The `cd` command changes the directory you're working with. In order to work with your newly created Docusaurus site, you'll need to navigate the terminal there.
-
-The `npm run start` command builds your website locally and serves it through a development server, ready for you to view at http://localhost:3000/.
-
-Open `docs/intro.md` (this page) and edit some lines: the site **reloads automatically** and displays your changes.
+Ready to get started? Head to the [Installation Guide](getting-started/installation) to begin your journey with Boson.

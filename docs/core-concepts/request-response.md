@@ -1,565 +1,321 @@
 ---
-sidebar_position: 5
-title: Request & Response
+sidebar_position: 4
+title: Request and Response
 ---
 
-# Request and Response in Boson
+# Request and Response Objects
 
-The Request and Response classes are fundamental building blocks in Boson. They provide a clean, object-oriented interface for working with HTTP requests and responses. This guide explains their features and how to use them effectively.
+The Request and Response objects are the core components you'll interact with when handling HTTP requests in Boson. Understanding these objects is essential for building effective web applications.
 
 ## The Request Object
 
-The `boson::Request` class represents an incoming HTTP request from a client. It provides methods to access all aspects of the request, including URL parameters, query strings, headers, cookies, and request body.
-
-### Creating Request Objects
-
-Typically, you'll work with Request objects that Boson creates automatically from incoming HTTP requests. However, for testing or special cases, you can create custom Request objects:
-
-```cpp
-// Create a request from a URL (for testing)
-auto request = boson::Request::fromUrl("GET", "/users/123");
-
-// Create a request with headers
-auto requestWithHeaders = boson::Request::fromUrl("GET", "/api/data")
-    .header("Authorization", "Bearer token123")
-    .header("Accept", "application/json");
-
-// Create a request with JSON body
-auto postRequest = boson::Request::fromUrl("POST", "/api/users")
-    .header("Content-Type", "application/json")
-    .body("{\"name\":\"John\",\"email\":\"john@example.com\"}");
-```
+The `boson::Request` object represents an incoming HTTP request and provides methods to access its data, including headers, URL parameters, query parameters, and body content.
 
 ### Request Properties
 
-#### HTTP Method
-
 ```cpp
-// Get the HTTP method
-std::string method = request.method();  // "GET", "POST", etc.
-
-// Check the method
-if (request.isMethod("POST")) {
-    // Handle POST request
-}
-```
-
-#### URL and Path
-
-```cpp
-// Get the full URL
-std::string url = request.url();  // "https://example.com/users/123?sort=name"
-
-// Get just the path
-std::string path = request.path();  // "/users/123"
-
-// Get the path without query string
-std::string fullPath = request.fullPath();  // "/users/123?sort=name"
-
-// Check if the path matches a pattern
-if (request.pathIs("/users/*")) {
-    // Path starts with "/users/"
-}
-```
-
-#### Route Parameters
-
-```cpp
-// Get a route parameter by name
-std::string userId = request.param("id");  // "123" from "/users/{id}"
-
-// Get a parameter with type conversion
-int userIdInt = request.param<int>("id");  // 123 as integer
-
-// Check if a parameter exists
-if (request.hasParam("id")) {
-    // Parameter exists
-}
-
-// Get all parameters as a map
-auto params = request.allParams();  // {"id": "123", ...}
-```
-
-#### Query Parameters
-
-```cpp
-// Get a query parameter by name
-std::string sortBy = request.query("sort");  // "name" from "?sort=name"
-
-// Get a query parameter with default value
-std::string orderBy = request.query("order", "asc");  // "asc" if not provided
-
-// Get a query parameter with type conversion
-int page = request.query<int>("page", 1);  // Default to page 1
-
-// Check if a query parameter exists
-if (request.hasQuery("filter")) {
-    // Parameter exists
-}
-
-// Get all query parameters
-auto queryParams = request.allQueryParams();  // {"sort": "name", "page": "1"}
-```
-
-#### Headers
-
-```cpp
-// Get a header by name (case-insensitive)
-std::string contentType = request.header("Content-Type");
-
-// Get a header with default value
-std::string acceptLanguage = request.header("Accept-Language", "en-US");
-
-// Check if a header exists
-if (request.hasHeader("Authorization")) {
-    // Header exists
-}
-
-// Get all headers
-auto headers = request.allHeaders();
-```
-
-#### Cookies
-
-```cpp
-// Get a cookie by name
-std::string sessionId = request.cookie("session_id");
-
-// Get a cookie with default value
-std::string theme = request.cookie("theme", "light");
-
-// Check if a cookie exists
-if (request.hasCookie("user_preferences")) {
-    // Cookie exists
-}
-
-// Get all cookies
-auto cookies = request.allCookies();
-```
-
-#### Request Body
-
-```cpp
-// Get raw request body as string
-std::string rawBody = request.body();
-
-// Parse JSON body
-if (request.contentType() == "application/json") {
-    auto jsonBody = request.jsonBody();
-    std::string name = jsonBody["name"].get<std::string>();
-    std::string email = jsonBody["email"].get<std::string>();
-}
-
-// Parse form data
-if (request.contentType() == "application/x-www-form-urlencoded") {
-    auto formData = request.formData();
-    std::string username = formData["username"];
-    std::string password = formData["password"];
-}
-```
-
-#### Files
-
-```cpp
-// Check if the request has file uploads
-if (request.hasFiles()) {
-    // Get an uploaded file by field name
-    auto file = request.file("profile_image");
+void handleRequest(const boson::Request& req, boson::Response& res) {
+    // Get request method (GET, POST, PUT, DELETE, etc.)
+    std::string method = req.method();
     
-    // Get file properties
-    std::string fileName = file.name();          // Original filename
-    std::string contentType = file.mimeType();   // "image/jpeg"
-    size_t size = file.size();                   // File size in bytes
+    // Get request path (/api/users, /products/123, etc.)
+    std::string path = req.path();
     
-    // Move the file to a permanent location
-    file.moveTo("/path/to/uploads/" + file.name());
+    // Get original URL including query string (/search?q=term&page=1)
+    std::string url = req.url();
     
-    // Or get the file content as a stream
-    auto& stream = file.stream();
-    // Process the stream...
-}
-
-// Get all uploaded files for a field (multiple uploads with the same name)
-auto files = request.files("documents");
-for (const auto& file : files) {
-    // Process each file
+    // Get HTTP protocol version
+    std::string httpVersion = req.httpVersion();
+    
+    // Get client IP address
+    std::string ip = req.ip();
+    
+    // Get content type
+    std::string contentType = req.contentType();
 }
 ```
 
-#### Client Information
+### Headers
+
+Access request headers:
 
 ```cpp
-// Get client IP address
-std::string ip = request.clientIp();
-
-// Get the hostname from the request
-std::string host = request.host();  // "example.com"
-
-// Get the port
-int port = request.port();  // 443
-
-// Check if the request is HTTPS
-bool isSecure = request.isSecure();
+void handleRequest(const boson::Request& req, boson::Response& res) {
+    // Get a specific header (case-insensitive)
+    std::string userAgent = req.header("User-Agent");
+    
+    // Get a header with a default value if not present
+    std::string accept = req.header("Accept", "application/json");
+    
+    // Check if a header exists
+    bool hasAuth = req.hasHeader("Authorization");
+    
+    // Get all headers as a map
+    auto headers = req.headers();
+    for (const auto& [name, value] : headers) {
+        std::cout << name << ": " << value << std::endl;
+    }
+}
 ```
 
-#### Attributes
+### Route Parameters
 
-Request attributes enable passing data between middleware components and controller actions:
+Access route parameters defined with the `:param` syntax in route paths:
 
 ```cpp
-// Set an attribute
-request = request.withAttribute("user_id", 123);
-
-// Get an attribute
-if (request.hasAttribute("user_id")) {
-    int userId = request.attribute<int>("user_id");
+// Route defined as: app.get("/users/:id/posts/:postId", ...)
+void handleRequest(const boson::Request& req, boson::Response& res) {
+    // Get route parameters by name
+    std::string userId = req.param("id");
+    std::string postId = req.param("postId");
+    
+    // Get a parameter with a default value if not present
+    std::string category = req.param("category", "general");
+    
+    // Get all parameters as a map
+    auto params = req.params();
 }
-
-// Get all attributes
-auto attributes = request.allAttributes();
 ```
 
-### Request Validation
+### Query Parameters
 
-Boson provides convenient methods to validate request data:
+Access query string parameters from the URL:
 
 ```cpp
-// Validate request data
-auto validation = request.validate({
-    {"name", "required|string|max:255"},
-    {"email", "required|email|unique:users,email"},
-    {"age", "required|integer|min:18"},
-    {"website", "url|nullable"},
-    {"profile_image", "file|image|max:2048"}
-});
-
-// Check if validation passed
-if (validation.fails()) {
-    // Get validation errors
-    auto errors = validation.errors();
-    return boson::Response::unprocessableEntity()
-        .json(errors);
+// Request URL: /search?q=boson&page=2&sort=desc
+void handleRequest(const boson::Request& req, boson::Response& res) {
+    // Get a specific query parameter
+    std::string query = req.query("q");  // "boson"
+    
+    // Get a query parameter with a default value
+    std::string page = req.query("page", "1");  // "2"
+    std::string limit = req.query("limit", "10");  // "10" (default)
+    
+    // Get a query parameter as a specific type
+    int pageNum = req.queryAs<int>("page", 1);  // 2
+    
+    // Check if a query parameter exists
+    bool hasSort = req.hasQuery("sort");  // true
+    
+    // Get all query parameters as a map
+    auto queries = req.queryParams();
+    for (const auto& [key, value] : queries) {
+        std::cout << key << ": " << value << std::endl;
+    }
 }
+```
 
-// Get validated data
-auto validated = validation.validated();
-std::string name = validated["name"].get<std::string>();
-int age = validated["age"].get<int>();
+### Request Body
+
+Access the request body in different formats:
+
+```cpp
+void handleRequest(const boson::Request& req, boson::Response& res) {
+    // Get raw body as string
+    std::string rawBody = req.body();
+    
+    // Parse JSON body
+    nlohmann::json jsonBody = req.json();
+    
+    // Check if JSON body contains a key
+    if (jsonBody.contains("username")) {
+        std::string username = jsonBody["username"];
+    }
+    
+    // Parse form data (application/x-www-form-urlencoded)
+    auto formData = req.form();
+    std::string name = formData["name"];
+    
+    // Access file uploads (multipart/form-data)
+    auto files = req.files();
+    for (const auto& file : files) {
+        std::string fieldName = file.fieldName;
+        std::string fileName = file.fileName;
+        std::string contentType = file.contentType;
+        size_t size = file.size;
+        
+        // Access file data
+        const auto& data = file.data;
+        
+        // Or save the file to disk
+        file.saveTo("/path/to/uploads/" + fileName);
+    }
+}
+```
+
+### Cookies
+
+Access cookies from the request:
+
+```cpp
+void handleRequest(const boson::Request& req, boson::Response& res) {
+    // Get a specific cookie
+    std::string sessionId = req.cookie("sessionId");
+    
+    // Get a cookie with a default value
+    std::string theme = req.cookie("theme", "light");
+    
+    // Check if a cookie exists
+    bool hasConsent = req.hasCookie("cookieConsent");
+    
+    // Get all cookies as a map
+    auto cookies = req.cookies();
+}
 ```
 
 ## The Response Object
 
-The `boson::Response` class represents an HTTP response that will be sent back to the client. It provides methods to set status codes, headers, cookies, and the response body.
+The `boson::Response` object represents the HTTP response that your server sends back to the client. It provides methods to set status codes, headers, and the response body.
 
-### Creating Response Objects
-
-Boson offers several factory methods to create common response types:
+### Setting Status Codes
 
 ```cpp
-// Basic responses
-auto okResponse = boson::Response::ok("Hello, World!");
-auto notFoundResponse = boson::Response::notFound();
-auto serverErrorResponse = boson::Response::serverError();
-
-// JSON responses
-auto jsonResponse = boson::Response::json({
-    {"id", 123},
-    {"name", "John Doe"},
-    {"email", "john@example.com"}
-});
-
-// File responses
-auto fileResponse = boson::Response::file("/path/to/document.pdf", "application/pdf");
-
-// View responses
-auto viewResponse = boson::Response::view("users.show", {
-    {"user", userModel},
-    {"title", "User Profile"}
-});
+void handleRequest(const boson::Request& req, boson::Response& res) {
+    // Set status code
+    res.status(200);  // OK
+    
+    // Set status with predefined constants
+    res.status(boson::StatusCode::CREATED);  // 201
+    res.status(boson::StatusCode::NOT_FOUND);  // 404
+    
+    // Chainable API
+    res.status(200).send("Success");
+}
 ```
 
-### Response Status Codes
+### Setting Headers
 
 ```cpp
-// Create a response with specific status code
-auto response = boson::Response(200);
-
-// Set status code on an existing response
-response.statusCode(404);
-
-// Convenience methods for common status codes
-auto okResponse = boson::Response::ok();                    // 200
-auto createdResponse = boson::Response::created();          // 201
-auto acceptedResponse = boson::Response::accepted();        // 202
-auto noContentResponse = boson::Response::noContent();      // 204
-auto badRequestResponse = boson::Response::badRequest();    // 400
-auto unauthorizedResponse = boson::Response::unauthorized();// 401
-auto forbiddenResponse = boson::Response::forbidden();      // 403
-auto notFoundResponse = boson::Response::notFound();        // 404
-auto serverErrorResponse = boson::Response::serverError();  // 500
+void handleRequest(const boson::Request& req, boson::Response& res) {
+    // Set a single header
+    res.header("Content-Type", "application/json");
+    
+    // Set multiple headers
+    res.header("Cache-Control", "no-cache")
+       .header("X-Powered-By", "Boson");
+    
+    // Append to an existing header
+    res.appendHeader("Set-Cookie", "theme=dark; Path=/");
+    res.appendHeader("Set-Cookie", "sessionId=abc123; HttpOnly");
+}
 ```
 
-### Response Body
+### Sending Responses
 
 ```cpp
-// Set the response body
-response.body("Hello, World!");
-
-// Chain methods for fluent API
-response.statusCode(200)
-        .body("Success!");
-
-// JSON body
-response.json({
-    {"success", true},
-    {"data", {
-        {"id", 123},
-        {"name", "Product Name"},
-        {"price", 19.99}
-    }}
-});
+void handleRequest(const boson::Request& req, boson::Response& res) {
+    // Send a text response
+    res.send("Hello, World!");
+    
+    // Send with a specific content type
+    res.type("text/plain").send("Plain text response");
+    
+    // Send HTML
+    res.send("<h1>Hello, Boson!</h1>");
+    
+    // Send JSON from a string
+    res.type("application/json").send("{\"message\":\"Hello, World!\"}");
+    
+    // Send JSON from an object (using nlohmann::json)
+    nlohmann::json jsonResponse = {
+        {"message", "Hello, World!"},
+        {"success", true},
+        {"code", 200}
+    };
+    res.jsonObject(jsonResponse);
+    
+    // Send a JSON response directly
+    res.jsonObject({
+        {"message", "Hello, World!"},
+        {"timestamp", "2025-04-15T12:30:00Z"}
+    });
+    
+    // Send a file
+    res.sendFile("/path/to/file.pdf");
+    
+    // Send a file with a specific filename
+    res.sendFile("/path/to/file.pdf", "document.pdf");
+    
+    // Download a file (forces download rather than display)
+    res.download("/path/to/file.pdf", "document.pdf");
+    
+    // Send with a specific status code (chaining)
+    res.status(201).send("Resource created");
+    
+    // No content response
+    res.status(204).send();
+}
 ```
 
-### Response Headers
+### Setting Cookies
 
 ```cpp
-// Set a single header
-response.header("Content-Type", "text/html");
-
-// Set multiple headers
-response.headers({
-    {"Content-Type", "application/json"},
-    {"X-Custom-Header", "Value"},
-    {"Cache-Control", "no-cache, no-store"}
-});
-
-// Common headers have convenience methods
-response.contentType("application/json");
-response.cacheControl("public, max-age=3600");
-```
-
-### Response Cookies
-
-```cpp
-// Set a basic cookie
-response.cookie("session_id", "abc123");
-
-// Set a cookie with options
-response.cookie("user_preferences", "theme=dark", {
-    {"expires", 3600},            // Lifetime in seconds
-    {"path", "/"},                // Cookie path
-    {"domain", "example.com"},    // Cookie domain
-    {"secure", true},             // HTTPS only
-    {"httpOnly", true},           // Not accessible to JavaScript
-    {"sameSite", "lax"}           // SameSite policy
-});
-
-// Set a raw cookie string
-response.rawCookie("CookieName=CookieValue; Path=/; HttpOnly");
-
-// Remove a cookie
-response.removeCookie("old_cookie");
+void handleRequest(const boson::Request& req, boson::Response& res) {
+    // Set a basic cookie
+    res.cookie("name", "value");
+    
+    // Set a cookie with options
+    res.cookie("sessionId", "abc123", {
+        {"maxAge", "3600"},      // 1 hour in seconds
+        {"path", "/"},
+        {"httpOnly", "true"},
+        {"secure", "true"}
+    });
+    
+    // Remove a cookie
+    res.clearCookie("name");
+    
+    // Chain cookie operations
+    res.cookie("theme", "dark")
+       .cookie("lang", "en")
+       .send("Cookies set");
+}
 ```
 
 ### Redirects
 
 ```cpp
-// Simple redirect
-auto redirectResponse = boson::Response::redirect("/dashboard");
-
-// Redirect with status code
-auto temporaryRedirectResponse = boson::Response::redirect("/login", 307);
-
-// Redirect to a named route
-auto namedRouteRedirect = boson::Response::redirectToRoute("user.profile", {{"id", "123"}});
-
-// Redirect back to the previous page
-auto backRedirect = boson::Response::back();
-
-// Redirect with flash data
-auto redirectWithFlash = boson::Response::redirect("/dashboard")
-    .withFlash("success", "Profile updated successfully!");
-```
-
-### File Downloads
-
-```cpp
-// File download with automatic content type detection
-auto fileResponse = boson::Response::download("/path/to/file.pdf");
-
-// File download with custom filename
-auto namedFileResponse = boson::Response::download("/path/to/file.pdf", "report.pdf");
-
-// File download with content type and disposition
-auto customFileResponse = boson::Response::download("/path/to/file.pdf")
-    .contentType("application/pdf")
-    .header("Content-Disposition", "attachment; filename=\"annual-report.pdf\"");
-```
-
-### Streaming Responses
-
-For large responses, you can use streaming to avoid loading the entire content into memory:
-
-```cpp
-// Create a streaming response
-auto streamingResponse = boson::Response::stream([](boson::ResponseStream& stream) {
-    // Stream content in chunks
-    stream.write("<html>");
-    stream.write("<body>");
+void handleRequest(const boson::Request& req, boson::Response& res) {
+    // Simple redirect (302 Found)
+    res.redirect("/new-location");
     
-    // Generate large content in chunks
-    for (int i = 0; i < 1000; i++) {
-        stream.write("<p>Line " + std::to_string(i) + "</p>");
-        
-        // Flush periodically to send data to the client
-        if (i % 100 == 0) {
-            stream.flush();
-        }
-    }
+    // Redirect with specific status code
+    res.redirect("/permanent-location", 301);  // Moved Permanently
     
-    stream.write("</body>");
-    stream.write("</html>");
-});
-
-// Set headers for streaming response
-streamingResponse.contentType("text/html");
-```
-
-### Server-Sent Events
-
-```cpp
-// Create a Server-Sent Events response
-auto sseResponse = boson::Response::sse([](boson::SseStream& stream) {
-    // Send periodic updates
-    for (int i = 0; i < 10; i++) {
-        // Send a named event with data
-        stream.event("update", "{\"progress\":" + std::to_string(i * 10) + "}");
-        
-        // Sleep between events
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-    }
-    
-    // Send a completion event
-    stream.event("complete", "{\"status\":\"done\"}");
-});
-```
-
-### Response Macros
-
-Boson allows defining response macros for commonly used response patterns:
-
-```cpp
-// Define a response macro
-boson::Response::macro("apiSuccess", [](auto data) {
-    return boson::Response::json({
-        {"success", true},
-        {"data", data},
-        {"timestamp", std::time(nullptr)}
-    });
-});
-
-boson::Response::macro("apiError", [](int code, std::string message) {
-    return boson::Response::json({
-        {"success", false},
-        {"error", {
-            {"code", code},
-            {"message", message}
-        }},
-        {"timestamp", std::time(nullptr)}
-    }).statusCode(code);
-});
-
-// Use the macros
-auto successResponse = boson::Response::apiSuccess(userData);
-auto errorResponse = boson::Response::apiError(404, "User not found");
-```
-
-## Working with Request and Response Together
-
-Here's a typical example of processing a request and generating a response in a controller action:
-
-```cpp
-boson::Response updateUser(const boson::Request& request) {
-    // Get route parameter
-    int userId = request.param<int>("id");
-    
-    // Validate input
-    auto validation = request.validate({
-        {"name", "required|string|max:255"},
-        {"email", "required|email|unique:users,email," + std::to_string(userId)},
-        {"role", "in:admin,user,editor"}
-    });
-    
-    if (validation.fails()) {
-        return boson::Response::unprocessableEntity()
-            .json(validation.errors());
-    }
-    
-    try {
-        // Get validated data
-        auto data = validation.validated();
-        
-        // Update the user
-        auto user = userService_->updateUser(
-            userId,
-            data["name"].get<std::string>(),
-            data["email"].get<std::string>(),
-            data["role"].get<std::string>("user")
-        );
-        
-        // Return success response
-        return boson::Response::json(user)
-            .header("X-Resource-Version", user.version())
-            .cookie("last_action", "update_user");
-            
-    } catch (const UserNotFoundException& e) {
-        return boson::Response::notFound()
-            .json({{"error", "User not found"}});
-            
-    } catch (const std::exception& e) {
-        logger_->error("Failed to update user: {}", e.what());
-        
-        return boson::Response::serverError()
-            .json({{"error", "Failed to update user"}});
-    }
+    // Redirect to a different domain
+    res.redirect("https://example.com/page");
 }
 ```
 
-## Testing Requests and Responses
+### Response Streaming
 
-Boson provides utilities for testing controllers with requests and verifying responses:
+For large responses, you can use streaming:
 
 ```cpp
-#include <boson/testing/http_tester.hpp>
-#include <gtest/gtest.h>
+void handleRequest(const boson::Request& req, boson::Response& res) {
+    // Start a streaming response
+    auto stream = res.stream();
+    
+    // Write data in chunks
+    stream->write("Chunk 1");
+    stream->write("Chunk 2");
+    
+    // End the stream
+    stream->end();
+}
+```
 
-// In your test
-TEST(UserControllerTest, UpdateUser) {
-    // Create the application
-    boson::Application app;
-    app.registerController<UserController>();
+### Compression
+
+Enable response compression:
+
+```cpp
+void handleRequest(const boson::Request& req, boson::Response& res) {
+    // Enable compression for this response
+    res.compress(true);
     
-    // Create HTTP tester
-    boson::HttpTester tester(app);
-    
-    // Make a request to the controller
-    auto response = tester.put("/users/123")
-        .json({
-            {"name", "Updated Name"},
-            {"email", "updated@example.com"},
-            {"role", "editor"}
-        })
-        .send();
-    
-    // Assert response properties
-    ASSERT_EQ(200, response.statusCode());
-    ASSERT_EQ("application/json", response.contentType());
-    
-    // Assert JSON response
-    auto json = response.jsonBody();
-    ASSERT_EQ(123, json["id"].get<int>());
-    ASSERT_EQ("Updated Name", json["name"].get<std::string>());
-    ASSERT_EQ("updated@example.com", json["email"].get<std::string>());
+    // Send a potentially large response
+    res.sendFile("/path/to/large-file.txt");
 }
 ```
 
@@ -567,24 +323,76 @@ TEST(UserControllerTest, UpdateUser) {
 
 ### Request Handling
 
-1. **Validate all input**: Always validate incoming request data before using it.
-2. **Use type-safe parameter access**: Use `request.param<T>()` for automatic type conversion.
-3. **Keep raw data access minimal**: Prefer validated data over direct request access.
-4. **Be careful with file uploads**: Always validate file types and sizes.
-5. **Check content types**: Verify request content types before parsing bodies.
+1. **Validate input**: Always validate request parameters and body data
+2. **Use proper error handling**: Catch exceptions when processing request data
+3. **Handle missing values**: Provide default values for optional parameters
+4. **Content negotiation**: Check Accept headers to serve the right format
 
-### Response Generation
+```cpp
+void handleRequest(const boson::Request& req, boson::Response& res) {
+    try {
+        // Validate required parameters
+        if (!req.hasQuery("id")) {
+            return res.status(400).jsonObject({
+                {"error", "Missing required parameter 'id'"}
+            });
+        }
+        
+        // Parse and validate ID
+        int id;
+        try {
+            id = std::stoi(req.query("id"));
+        } catch (const std::exception&) {
+            return res.status(400).jsonObject({
+                {"error", "Invalid ID format"}
+            });
+        }
+        
+        // Content negotiation
+        std::string accept = req.header("Accept", "application/json");
+        if (accept.find("application/xml") != std::string::npos) {
+            // Return XML response
+            return res.type("application/xml").send("<response><message>Success</message></response>");
+        }
+        
+        // Return JSON by default
+        return res.jsonObject({
+            {"message", "Success"}
+        });
+    } catch (const std::exception& e) {
+        return res.status(500).jsonObject({
+            {"error", "Server error"},
+            {"message", e.what()}
+        });
+    }
+}
+```
 
-1. **Set appropriate status codes**: Use the correct HTTP status code for each response.
-2. **Set content types**: Always specify the content type of your responses.
-3. **Consider security headers**: Set appropriate security headers for all responses.
-4. **Use streaming for large responses**: Avoid loading large files into memory.
-5. **Be consistent**: Maintain a consistent response format across your API.
+### Response Best Practices
 
-## Next Steps
+1. **Set appropriate status codes**: Use the right HTTP status code for each response
+2. **Set correct content types**: Always set the Content-Type header properly
+3. **Security headers**: Include security-related headers (e.g., Content-Security-Policy)
+4. **Consistency**: Maintain a consistent response format
 
-Now that you understand request and response handling in Boson, explore these related topics:
-
-1. Learn about [Error Handling](error-handling.md) for robust error management
-2. Explore [Middleware](middleware.md) for processing requests and responses
-3. Understand [Controllers](controllers.md) for organizing route handlers
+```cpp
+void handleRequest(const boson::Request& req, boson::Response& res) {
+    // Set security headers
+    res.header("X-Content-Type-Options", "nosniff")
+       .header("X-Frame-Options", "DENY")
+       .header("Content-Security-Policy", "default-src 'self'");
+    
+    // Use consistent response format
+    res.jsonObject({
+        {"success", true},
+        {"data", {
+            {"id", 123},
+            {"name", "Example"}
+        }},
+        {"meta", {
+            {"version", "1.0"},
+            {"timestamp", "2025-04-15T12:30:00Z"}
+        }}
+    });
+}
+```

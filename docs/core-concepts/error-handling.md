@@ -5,610 +5,410 @@ title: Error Handling
 
 # Error Handling in Boson
 
-Effective error handling is crucial for creating robust web applications. Boson provides a comprehensive error handling system that helps you gracefully manage exceptions and present appropriate responses to users. This guide explains how to use Boson's error handling features.
+Proper error handling is essential for creating robust web applications. Boson provides several tools and patterns to help you handle errors effectively and provide useful responses to clients.
 
-## Error Handling Architecture
+## Types of Errors
 
-Boson's error handling architecture operates at multiple levels:
+When building web applications with Boson, you'll encounter different types of errors:
 
-1. **Global Error Handlers**: Application-wide handlers for specific exception types
-2. **Middleware Error Handling**: Error handling in middleware pipeline
-3. **Controller Error Handling**: Try-catch blocks in controller actions
-4. **Route-Specific Error Handling**: Error handlers for specific routes
-5. **Fallback Error Handlers**: Default handlers when no specific handler exists
+1. **Client Errors**: Issues with client requests (4xx status codes)
+2. **Server Errors**: Issues with your application logic (5xx status codes)
+3. **Validation Errors**: Issues with request data validation
+4. **Runtime Exceptions**: Unexpected exceptions during request handling
+5. **Network Errors**: Issues with connections or external services
 
-## Exception Types
+## Basic Error Handling
 
-Boson includes several built-in exception types:
-
-```cpp
-// Base exception class for all Boson exceptions
-class BosonException : public std::runtime_error { /* ... */ };
-
-// HTTP exceptions with status codes
-class HttpException : public BosonException { /* ... */ };
-class NotFoundException : public HttpException { /* ... */ };
-class UnauthorizedException : public HttpException { /* ... */ };
-class ForbiddenException : public HttpException { /* ... */ };
-class ValidationException : public HttpException { /* ... */ };
-
-// Application logic exceptions
-class DatabaseException : public BosonException { /* ... */ };
-class ConfigurationException : public BosonException { /* ... */ };
-class FileSystemException : public BosonException { /* ... */ };
-
-// Request processing exceptions
-class InvalidParameterException : public BosonException { /* ... */ };
-class RouteNotFoundException : public NotFoundException { /* ... */ };
-class MethodNotAllowedException : public HttpException { /* ... */ };
-```
-
-## Global Error Handlers
-
-Register error handlers at the application level to handle specific exception types:
+The simplest way to handle errors is directly within route handlers:
 
 ```cpp
-#include <boson/boson.hpp>
-
-int main() {
-    boson::Application app;
-    
-    // Handle 404 Not Found exceptions
-    app.handleException<boson::NotFoundException>([](const auto& exception, const boson::Request& request) {
-        return boson::Response::view("errors.not-found", {{"path", request.path()}})
-            .statusCode(404);
-    });
-    
-    // Handle validation exceptions
-    app.handleException<boson::ValidationException>([](const auto& exception, const boson::Request& request) {
-        // Return validation errors as JSON or HTML based on the request
-        if (request.wantsJson()) {
-            return boson::Response::json({
-                {"error", "Validation failed"},
-                {"fields", exception.errors()}
-            }).statusCode(422);
+app.get("/users/:id", [](const boson::Request& req, boson::Response& res) {
+    try {
+        std::string id = req.param("id");
+        
+        // Validate ID
+        if (!isValidId(id)) {
+            return res.status(400).jsonObject({
+                {"error", "Invalid ID format"},
+                {"message", "User ID must be a positive integer"}
+            });
         }
         
-        return boson::Response::view("errors.validation", {
-            {"errors", exception.errors()},
-            {"old", request.all()}
-        }).statusCode(422);
-    });
-    
-    // Handle database exceptions
-    app.handleException<boson::DatabaseException>([](const auto& exception, const boson::Request& request) {
-        // Log the error
-        app.logger()->error("Database error: {}", exception.what());
+        // Try to fetch the user
+        User user = getUserById(id);
         
-        return boson::Response::serverError()
-            .view("errors.database-error");
-    });
-    
-    // Catch-all handler for any unhandled exceptions
-    app.handleException<std::exception>([](const auto& exception, const boson::Request& request) {
-        // Log the unexpected error
-        app.logger()->critical("Unhandled exception: {}", exception.what());
-        
-        return boson::Response::serverError()
-            .view("errors.generic");
-    });
-    
-    // Rest of your application setup
-    // ...
-    
-    boson::Server server(app);
-    server.listen(8080);
-    return 0;
-}
-```
-
-## Custom Exception Classes
-
-Create custom exception classes for your application's specific needs:
-
-```cpp
-#include <boson/exceptions.hpp>
-
-// Custom domain exception
-class UserNotFoundException : public boson::NotFoundException {
-public:
-    UserNotFoundException(int userId)
-        : NotFoundException("User with ID " + std::to_string(userId) + " not found"),
-          userId_(userId) {}
-          
-    int userId() const { return userId_; }
-    
-private:
-    int userId_;
-};
-
-// Custom application exception
-class PaymentFailedException : public boson::HttpException {
-public:
-    PaymentFailedException(std::string message, std::string errorCode)
-        : HttpException(message, 402),  // 402 Payment Required
-          errorCode_(std::move(errorCode)) {}
-          
-    const std::string& errorCode() const { return errorCode_; }
-    
-private:
-    std::string errorCode_;
-};
-```
-
-Register handlers for your custom exceptions:
-
-```cpp
-// Handle user not found exceptions
-app.handleException<UserNotFoundException>([](const auto& exception, const boson::Request& request) {
-    return boson::Response::notFound()
-        .view("errors.user-not-found", {{"userId", exception.userId()}});
-});
-
-// Handle payment failures
-app.handleException<PaymentFailedException>([](const auto& exception, const boson::Request& request) {
-    return boson::Response::json({
-        {"error", exception.what()},
-        {"errorCode", exception.errorCode()},
-        {"paymentUrl", "/payments/retry"}
-    }).statusCode(402);
-});
-```
-
-## Throwing Exceptions
-
-You can throw exceptions at any point in your application:
-
-```cpp
-boson::Response getUserProfile(const boson::Request& request) {
-    int userId = request.param<int>("id");
-    
-    auto user = userRepository_->findById(userId);
-    
-    if (!user) {
-        // Throw a custom exception
-        throw UserNotFoundException(userId);
-    }
-    
-    // Check authorization
-    if (!request.user() || request.user()->id() != userId) {
-        // Throw a built-in exception
-        throw boson::ForbiddenException("You don't have permission to view this profile");
-    }
-    
-    return boson::Response::view("users.profile", {{"user", *user}});
-}
-```
-
-## HTTP Exception Shortcuts
-
-Boson provides convenient methods for generating HTTP error responses without throwing exceptions:
-
-```cpp
-boson::Response updateUser(const boson::Request& request) {
-    int userId = request.param<int>("id");
-    
-    // Find the user
-    auto user = userRepository_->findById(userId);
-    if (!user) {
-        // Return a 404 response without throwing
-        return boson::Response::notFound()
-            .json({{"error", "User not found"}});
-    }
-    
-    // Check permissions
-    if (!request.user()->canEdit(user)) {
-        // Return a 403 response without throwing
-        return boson::Response::forbidden()
-            .json({{"error", "You don't have permission to edit this user"}});
-    }
-    
-    // Validate input
-    auto validation = request.validate({
-        {"name", "required|string|max:255"},
-        {"email", "required|email|unique:users,email," + std::to_string(userId)}
-    });
-    
-    if (validation.fails()) {
-        // Return a 422 validation error response
-        return boson::Response::unprocessableEntity()
-            .json(validation.errors());
-    }
-    
-    // Process the update
-    // ...
-    
-    return boson::Response::ok(user);
-}
-```
-
-## Middleware Error Handling
-
-Middleware can catch and handle exceptions thrown by other middleware or route handlers:
-
-```cpp
-class ErrorHandlingMiddleware : public boson::Middleware {
-public:
-    boson::Response process(const boson::Request& request, MiddlewareNext next) override {
-        try {
-            // Process the request through the middleware chain
-            return next(request);
-        } catch (const boson::DatabaseException& e) {
-            // Log the error
-            logger_->error("Database error: {}", e.what());
-            
-            // Return an error response
-            return boson::Response::serverError()
-                .json({{"error", "A database error occurred"}});
-        } catch (const std::exception& e) {
-            // Log the error
-            logger_->error("Unhandled exception: {}", e.what());
-            
-            // Return a generic error response
-            return boson::Response::serverError()
-                .json({{"error", "An unexpected error occurred"}});
+        // Check if user exists
+        if (user.id.empty()) {
+            return res.status(404).jsonObject({
+                {"error", "Not Found"},
+                {"message", "User with ID " + id + " does not exist"}
+            });
         }
+        
+        // Success response
+        res.jsonObject(user.toJson());
+    } 
+    catch (const std::exception& e) {
+        // Server error
+        res.status(500).jsonObject({
+            {"error", "Internal Server Error"},
+            {"message", "An unexpected error occurred"},
+            {"details", e.what()}
+        });
+    }
+});
+```
+
+## Using HttpError Class
+
+Boson provides an `HttpError` class for more standardized error handling:
+
+```cpp
+#include <boson/error_handler.hpp>
+
+app.get("/users/:id", [](const boson::Request& req, boson::Response& res) {
+    try {
+        std::string id = req.param("id");
+        
+        // Validate ID
+        if (!isValidId(id)) {
+            throw boson::HttpError("Invalid ID format", 400);
+        }
+        
+        // Try to fetch the user
+        User user = getUserById(id);
+        
+        // Check if user exists
+        if (user.id.empty()) {
+            throw boson::HttpError("User not found", 404);
+        }
+        
+        // Success response
+        res.jsonObject(user.toJson());
+    } 
+    catch (const boson::HttpError& e) {
+        // Handle HTTP errors with proper status
+        res.status(e.statusCode()).jsonObject({
+            {"error", e.what()},
+            {"status", e.statusCode()}
+        });
+    }
+    catch (const std::exception& e) {
+        // Handle other exceptions
+        res.status(500).jsonObject({
+            {"error", "Internal Server Error"},
+            {"message", e.what()}
+        });
+    }
+});
+```
+
+## Global Error Handler Middleware
+
+For consistent error handling across your entire application, use error handler middleware:
+
+```cpp
+// Create a global error handler
+auto errorHandler = [](const boson::Request& req, boson::Response& res, boson::NextFunction& next) {
+    try {
+        // Pass to next middleware or route handler
+        next();
+    }
+    catch (const boson::HttpError& e) {
+        // Handle HTTP errors
+        res.status(e.statusCode()).jsonObject({
+            {"error", e.what()},
+            {"status", e.statusCode()},
+            {"path", req.path()}
+        });
+    }
+    catch (const std::exception& e) {
+        // Handle standard exceptions
+        res.status(500).jsonObject({
+            {"error", "Internal Server Error"},
+            {"message", e.what()},
+            {"path", req.path()}
+        });
+    }
+    catch (...) {
+        // Handle unknown errors
+        res.status(500).jsonObject({
+            {"error", "Internal Server Error"},
+            {"message", "An unknown error occurred"},
+            {"path", req.path()}
+        });
     }
 };
-```
 
-Register the error handling middleware early in your middleware chain:
+// Add the error handler as the last middleware
+app.use(errorHandler);
 
-```cpp
-// Register error handling middleware
-app.useMiddleware<ErrorHandlingMiddleware>();
-
-// Register other middleware and routes
-// ...
-```
-
-## Route-Specific Error Handling
-
-You can register error handlers for specific routes or route groups:
-
-```cpp
-// Create a route group for API endpoints
-auto apiGroup = app.group("/api");
-
-// Set a specific error handler for this group
-apiGroup->onError([](const std::exception& e, const boson::Request& request) {
-    // Always return JSON errors for API routes
-    return boson::Response::json({
-        {"error", e.what()},
-        {"path", request.path()},
-        {"timestamp", std::time(nullptr)}
-    }).statusCode(500);
-});
-
-// Add routes to the group
-apiGroup->get("/users", getUsersHandler);
-apiGroup->post("/users", createUserHandler);
-```
-
-## HTTP Status Code Handlers
-
-Register handlers for specific HTTP status codes:
-
-```cpp
-// Handler for 404 Not Found status
-app.statusHandler(404, [](const boson::Request& request) {
-    return boson::Response::view("errors.not-found", {
-        {"path", request.path()},
-        {"requestId", request.id()}
-    }).statusCode(404);
-});
-
-// Handler for 500 Internal Server Error status
-app.statusHandler(500, [](const boson::Request& request) {
-    return boson::Response::view("errors.server-error", {
-        {"requestId", request.id()}
-    }).statusCode(500);
-});
-
-// Handler for maintenance mode (503 Service Unavailable)
-app.statusHandler(503, [](const boson::Request& request) {
-    return boson::Response::view("errors.maintenance", {
-        {"estimatedDowntime", "2 hours"}
-    }).statusCode(503)
-      .header("Retry-After", "7200");
+// Now routes can throw exceptions safely
+app.get("/users/:id", [](const boson::Request& req, boson::Response& res) {
+    std::string id = req.param("id");
+    
+    // Validate ID
+    if (!isValidId(id)) {
+        throw boson::HttpError("Invalid ID format", 400);
+    }
+    
+    // Try to fetch the user
+    User user = getUserById(id);
+    
+    // Check if user exists
+    if (user.id.empty()) {
+        throw boson::HttpError("User not found", 404);
+    }
+    
+    // Success response
+    res.jsonObject(user.toJson());
 });
 ```
 
-## Error Pages
+## Custom Error Types
 
-Create custom error pages for different HTTP status codes:
-
-```
-templates/
-└── errors/
-    ├── 404.html       # Not Found
-    ├── 500.html       # Server Error
-    ├── 403.html       # Forbidden
-    ├── 401.html       # Unauthorized
-    ├── maintenance.html # For maintenance mode
-    └── generic.html   # Fallback error page
-```
-
-Register these error pages with the application:
+You can create custom error types for specific error scenarios:
 
 ```cpp
-// Set up error pages
-app.errorPage(404, "errors/404.html");
-app.errorPage(500, "errors/500.html");
-app.errorPage(403, "errors/403.html");
-app.errorPage(401, "errors/401.html");
-app.errorPage(503, "errors/maintenance.html");
+// Define custom HTTP error types
+class ValidationError : public boson::HttpError {
+public:
+    ValidationError(const std::string& message, 
+                    const std::map<std::string, std::string>& errors)
+        : boson::HttpError(message, 400), validationErrors(errors) {}
+    
+    std::map<std::string, std::string> validationErrors;
+};
+
+class NotFoundError : public boson::HttpError {
+public:
+    NotFoundError(const std::string& resource, const std::string& id)
+        : boson::HttpError(resource + " with ID " + id + " not found", 404),
+          resourceType(resource), resourceId(id) {}
+          
+    std::string resourceType;
+    std::string resourceId;
+};
+
+class AuthorizationError : public boson::HttpError {
+public:
+    AuthorizationError(const std::string& message = "Unauthorized")
+        : boson::HttpError(message, 401) {}
+};
+
+// Enhanced error handler that handles custom error types
+auto errorHandler = [](const boson::Request& req, boson::Response& res, boson::NextFunction& next) {
+    try {
+        next();
+    }
+    catch (const ValidationError& e) {
+        res.status(e.statusCode()).jsonObject({
+            {"error", e.what()},
+            {"status", e.statusCode()},
+            {"validation_errors", e.validationErrors}
+        });
+    }
+    catch (const NotFoundError& e) {
+        res.status(e.statusCode()).jsonObject({
+            {"error", e.what()},
+            {"status", e.statusCode()},
+            {"resource", e.resourceType},
+            {"id", e.resourceId}
+        });
+    }
+    catch (const AuthorizationError& e) {
+        res.status(e.statusCode()).jsonObject({
+            {"error", e.what()},
+            {"status", e.statusCode()}
+        });
+    }
+    // ... handle other error types and general errors
+};
+
+// Use custom error types in your routes
+app.post("/users", [](const boson::Request& req, boson::Response& res) {
+    nlohmann::json body = req.json();
+    
+    // Validate request body
+    std::map<std::string, std::string> errors;
+    
+    if (!body.contains("username") || body["username"].empty()) {
+        errors["username"] = "Username is required";
+    }
+    
+    if (!body.contains("email") || body["email"].empty()) {
+        errors["email"] = "Email is required";
+    } else if (!isValidEmail(body["email"])) {
+        errors["email"] = "Email is invalid";
+    }
+    
+    if (!errors.empty()) {
+        throw ValidationError("Validation failed", errors);
+    }
+    
+    // Process valid request...
+});
+```
+
+## Asynchronous Error Handling
+
+For asynchronous operations, ensure you catch errors properly:
+
+```cpp
+app.get("/data", [](const boson::Request& req, boson::Response& res) {
+    // Start an asynchronous operation
+    fetchDataAsync()
+        .then([&res](const Data& data) {
+            // Success case
+            res.jsonObject(data.toJson());
+        })
+        .catch([&res](const std::exception& e) {
+            // Error case
+            res.status(500).jsonObject({
+                {"error", "Failed to fetch data"},
+                {"message", e.what()}
+            });
+        });
+});
+```
+
+## Validation Patterns
+
+For input validation, consider creating reusable validation functions:
+
+```cpp
+// Validation utility
+template <typename T>
+void validate(const T& value, 
+              const std::string& fieldName,
+              std::map<std::string, std::string>& errors,
+              const std::function<bool(const T&)>& validator,
+              const std::string& errorMessage) {
+    if (!validator(value)) {
+        errors[fieldName] = errorMessage;
+    }
+}
+
+// Using the validation utility
+app.post("/register", [](const boson::Request& req, boson::Response& res) {
+    auto body = req.json();
+    std::map<std::string, std::string> errors;
+    
+    // Validate required fields
+    if (body.contains("username")) {
+        std::string username = body["username"];
+        validate(username, "username", errors,
+                [](const std::string& u) { return u.size() >= 3 && u.size() <= 20; },
+                "Username must be between 3 and 20 characters");
+    } else {
+        errors["username"] = "Username is required";
+    }
+    
+    if (body.contains("email")) {
+        std::string email = body["email"];
+        validate(email, "email", errors,
+                [](const std::string& e) { return isValidEmail(e); },
+                "Email address is invalid");
+    } else {
+        errors["email"] = "Email is required";
+    }
+    
+    if (body.contains("password")) {
+        std::string password = body["password"];
+        validate(password, "password", errors,
+                [](const std::string& p) { return p.size() >= 8; },
+                "Password must be at least 8 characters");
+    } else {
+        errors["password"] = "Password is required";
+    }
+    
+    // If validation fails, throw appropriate error
+    if (!errors.empty()) {
+        throw ValidationError("Validation failed", errors);
+    }
+    
+    // Process valid registration...
+});
 ```
 
 ## Logging Errors
 
-Boson integrates with logging systems to record errors:
+Always log errors for debugging and monitoring:
 
 ```cpp
-// Configure application logger
-app.configureLogger([](boson::Logger& logger) {
-    // Set log level
-    logger.setLevel(boson::LogLevel::Info);
-    
-    // Add console output
-    logger.addHandler(std::make_unique<boson::ConsoleLogHandler>());
-    
-    // Add file output
-    logger.addHandler(std::make_unique<boson::FileLogHandler>("logs/app.log"));
-    
-    // Add error-specific file logger
-    auto errorLogger = std::make_unique<boson::FileLogHandler>("logs/errors.log");
-    errorLogger->setMinLevel(boson::LogLevel::Error);
-    logger.addHandler(std::move(errorLogger));
-});
-
-// Use the logger in your error handlers
-app.handleException<std::exception>([&app](const auto& exception, const boson::Request& request) {
-    // Get logger from application
-    auto logger = app.logger();
-    
-    // Log the error with context
-    logger->error("Exception in request to {}: {}", 
-                  request.path(), 
-                  exception.what());
-    
-    // Log extra details for severe errors
-    if (typeid(exception) == typeid(boson::DatabaseException) || 
-        typeid(exception) == typeid(boson::ServerException)) {
-        logger->critical("Stack trace: {}", boson::getStackTrace());
-        logger->critical("Request details: {}", request.toString());
+// Create an error logging middleware
+auto errorLogger = [](const boson::Request& req, boson::Response& res, boson::NextFunction& next) {
+    try {
+        next();
     }
-    
-    return boson::Response::serverError();
-});
-```
-
-## Error Reporting Services
-
-Integrate with error reporting services to track errors in production:
-
-```cpp
-// Create error reporting middleware
-class ErrorReportingMiddleware : public boson::Middleware {
-public:
-    ErrorReportingMiddleware(std::shared_ptr<ErrorReportService> reportService)
-        : reportService_(std::move(reportService)) {}
+    catch (const std::exception& e) {
+        // Log the error with important context
+        std::cerr << "[ERROR] " 
+                  << req.method() << " " << req.path() 
+                  << " - " << e.what() 
+                  << " - Client IP: " << req.ip() 
+                  << std::endl;
         
-    boson::Response process(const boson::Request& request, MiddlewareNext next) override {
-        try {
-            // Process the request
-            return next(request);
-        } catch (const std::exception& e) {
-            // Report the error to the service
-            reportService_->report(e, {
-                {"url", request.url()},
-                {"method", request.method()},
-                {"user", request.user() ? request.user()->id() : "guest"},
-                {"timestamp", std::time(nullptr)}
-            });
-            
-            // Re-throw to let other handlers process it
-            throw;
-        }
+        // Re-throw to be caught by the error handler
+        throw;
     }
-    
-private:
-    std::shared_ptr<ErrorReportService> reportService_;
 };
 
-// Set up the error reporting service
-auto errorReporter = std::make_shared<SentryErrorReportService>(
-    "https://your-sentry-dsn.ingest.sentry.io/project-id"
-);
-
-// Add the middleware
-app.useMiddleware<ErrorReportingMiddleware>(errorReporter);
-```
-
-## Validation Errors
-
-Handle validation errors with Boson's validation system:
-
-```cpp
-boson::Response createUser(const boson::Request& request) {
-    // Validate request data
-    auto validation = request.validate({
-        {"name", "required|string|max:255"},
-        {"email", "required|email|unique:users,email"},
-        {"password", "required|string|min:8|confirmed"},
-        {"role", "in:admin,user,guest"}
-    });
-    
-    // Check if validation failed
-    if (validation.fails()) {
-        // For API requests, return JSON errors
-        if (request.wantsJson()) {
-            return boson::Response::unprocessableEntity()
-                .json({
-                    {"message", "Validation failed"},
-                    {"errors", validation.errors()}
-                });
-        }
-        
-        // For form submissions, redirect back with errors and input
-        return boson::Response::redirect()
-            .back()
-            .withErrors(validation)
-            .withInput(request.except({"password"}));
-    }
-    
-    // Continue with valid data
-    auto data = validation.validated();
-    
-    // Create user...
-    
-    return boson::Response::created()
-        .json(newUser);
-}
-```
-
-## Handling Maintenance Mode
-
-Boson allows you to put your application into maintenance mode:
-
-```cpp
-// Check if app is in maintenance mode
-if (app.isDownForMaintenance()) {
-    // Return maintenance response
-}
-
-// Enable maintenance mode programmatically
-app.downForMaintenance(true);
-
-// Specify allowed IPs during maintenance
-app.setMaintenanceWhitelist({"192.168.1.1", "10.0.0.5"});
-
-// Create a custom maintenance mode handler
-app.setMaintenanceHandler([](const boson::Request& request) {
-    return boson::Response::view("errors.maintenance", {
-        {"startedAt", "2025-04-14 09:00 UTC"},
-        {"estimatedDuration", "2 hours"}
-    }).statusCode(503)
-      .header("Retry-After", "7200");
-});
-```
-
-## Error Handling for Different Environments
-
-Adjust error handling based on the current environment:
-
-```cpp
-// Configure environment-specific error handling
-if (app.environment() == "production") {
-    // In production, hide detailed errors
-    app.hideErrorDetails(true);
-    
-    // Use custom error pages
-    app.useCustomErrorPages(true);
-    
-    // Report errors to external service
-    app.useMiddleware<ErrorReportingMiddleware>(errorReporter);
-} else {
-    // In development, show detailed errors
-    app.hideErrorDetails(false);
-    
-    // Use debug error pages with stack traces
-    app.useCustomErrorPages(false);
-    
-    // Enable whoops-style error pages
-    app.useWhoopsErrorPages(true);
-}
-```
-
-## Error Response Formats
-
-Customize the format of error responses based on the request type:
-
-```cpp
-// Create a middleware for handling the error response format
-class ErrorFormatMiddleware : public boson::Middleware {
-public:
-    boson::Response process(const boson::Request& request, MiddlewareNext next) override {
-        try {
-            // Process the request normally
-            return next(request);
-        } catch (const std::exception& e) {
-            // Determine response format based on Accept header
-            if (request.wantsJson()) {
-                return jsonErrorResponse(e, request);
-            } else if (request.header("Accept").find("text/xml") != std::string::npos) {
-                return xmlErrorResponse(e, request);
-            } else {
-                return htmlErrorResponse(e, request);
-            }
-        }
-    }
-    
-private:
-    boson::Response jsonErrorResponse(const std::exception& e, const boson::Request& request);
-    boson::Response xmlErrorResponse(const std::exception& e, const boson::Request& request);
-    boson::Response htmlErrorResponse(const std::exception& e, const boson::Request& request);
-};
-
-// Register the middleware
-app.useMiddleware<ErrorFormatMiddleware>();
-```
-
-## Testing Error Handling
-
-Boson provides tools for testing error handling:
-
-```cpp
-#include <boson/testing/http_tester.hpp>
-#include <gtest/gtest.h>
-
-// Test exception handling
-TEST(ErrorHandlingTest, HandlesNotFoundException) {
-    // Create a test application
-    boson::Application app;
-    
-    // Register a controller that throws an exception
-    app.route("/users/{id}", [](const boson::Request& request) {
-        throw boson::NotFoundException("User not found: " + request.param("id"));
-    });
-    
-    // Register an exception handler
-    app.handleException<boson::NotFoundException>([](const auto& exception, const boson::Request&) {
-        return boson::Response::notFound()
-            .json({{"error", exception.what()}});
-    });
-    
-    // Create HTTP tester
-    boson::HttpTester tester(app);
-    
-    // Make a request to trigger the exception
-    auto response = tester.get("/users/123");
-    
-    // Assert the response
-    ASSERT_EQ(404, response.statusCode());
-    ASSERT_EQ("application/json", response.contentType());
-    
-    // Check the JSON response
-    auto json = response.jsonBody();
-    ASSERT_EQ("User not found: 123", json["error"].get<std::string>());
-}
+// Add the logger before the error handler
+app.use(errorLogger);
+app.use(errorHandler);
 ```
 
 ## Best Practices
 
-1. **Layer your error handling**: Use a combination of specific and generic handlers.
-2. **Handle exceptions appropriately**: Use appropriate HTTP status codes for different errors.
-3. **Log errors with context**: Include request details, user information, and other context.
-4. **Hide sensitive information**: Don't expose stack traces or internal details in production.
-5. **Format errors consistently**: Use consistent error response formats across your API.
-6. **Validate input early**: Catch validation errors before they cause problems deeper in your code.
-7. **Provide helpful error messages**: Error messages should help users understand what went wrong.
-8. **Use custom exception classes**: Create specific exception classes for your domain logic.
+1. **Use Centralized Error Handling**: Implement a global error handler
+2. **Be Specific**: Use specific error types for different scenarios
+3. **Hide Sensitive Information**: Don't expose stack traces or internal errors to clients
+4. **Include Context**: Include relevant information in error responses
+5. **Log Errors**: Always log errors for debugging
+6. **Use Status Codes Correctly**: Use appropriate HTTP status codes
+7. **Validation First**: Validate input before processing
+8. **Consistent Format**: Maintain a consistent error response format
 
-## Next Steps
+### Example Error Response Format
 
-Now that you understand error handling in Boson, explore these related topics:
+Adopting a consistent format makes errors easier to handle on the client side:
 
-1. Learn about [Logging](logging.md) for detailed application event tracking
-2. Explore [Validation](validation.md) for comprehensive request data validation
-3. Study [Security](../security/overview.md) for building secure applications
+```json
+{
+  "error": "Validation failed",
+  "status": 400,
+  "timestamp": "2025-04-15T10:30:00Z",
+  "path": "/api/users",
+  "validation_errors": {
+    "username": "Username must be between 3 and 20 characters",
+    "email": "Email address is invalid"
+  },
+  "request_id": "a1b2c3d4-e5f6-7890-abcd-1234567890ab"
+}
+```
+
+Implement this with:
+
+```cpp
+// Utility for consistent error responses
+nlohmann::json createErrorResponse(const std::string& errorMessage, 
+                                   int statusCode, 
+                                   const boson::Request& req,
+                                   const nlohmann::json& additionalData = {}) {
+    nlohmann::json response = {
+        {"error", errorMessage},
+        {"status", statusCode},
+        {"timestamp", getCurrentTimestamp()},
+        {"path", req.path()},
+        {"request_id", req.header("X-Request-ID", generateRequestId())}
+    };
+    
+    // Add any additional error data
+    for (auto& [key, value] : additionalData.items()) {
+        response[key] = value;
+    }
+    
+    return response;
+}
+```

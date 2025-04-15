@@ -1,138 +1,93 @@
-import {themes as prismThemes} from 'prism-react-renderer';
-import type {Config} from '@docusaurus/types';
-import type * as Preset from '@docusaurus/preset-classic';
+import { themes as prismThemes } from "prism-react-renderer";
+import type { Config } from "@docusaurus/types";
+import type * as Preset from "@docusaurus/preset-classic";
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 
 const config: Config = {
-  title: 'Boson Framework',
-  tagline: 'Modern C++ web framework for high-performance applications',
-  favicon: 'img/favicon.ico',
+  title: "Boson Framework",
+  tagline: "Modern C++ web framework for high-performance applications",
+  favicon: "img/favicon.ico",
 
-  url: 'https://bosonframework.dev',
-  baseUrl: '/',
+  url: "https://bosonframework.vercel.app/",
+  baseUrl: "/",
 
-  organizationName: 'boson', 
-  projectName: 'boson-framework', 
+  organizationName: "boson",
+  projectName: "boson-framework",
 
-  onBrokenLinks: 'log',
-  onBrokenMarkdownLinks: 'warn',
+  onBrokenLinks: "log",
+  onBrokenMarkdownLinks: "warn",
 
   i18n: {
-    defaultLocale: 'en',
-    locales: ['en'],
+    defaultLocale: "en",
+    locales: ["en"],
   },
 
   presets: [
     [
-      'classic',
+      "classic",
       {
         docs: {
-          sidebarPath: './sidebars.ts',
-          routeBasePath: '/',
-          editUrl: 'https://github.com/boson/boson-framework/tree/main/docs/',
-        },
-        blog: {
-          showReadingTime: true,
-          feedOptions: {
-            type: ['rss', 'atom'],
-            xslt: true,
-          },
-          editUrl: 'https://github.com/boson/boson-framework/tree/main/docs/blog/',
+          sidebarPath: "./sidebars.ts",
+          editUrl: "https://github.com/S1D007/Boson-Docs/blob/main/",
         },
         theme: {
-          customCss: './src/css/custom.css',
+          customCss: "./src/css/custom.css",
         },
       } satisfies Preset.Options,
     ],
   ],
 
   themeConfig: {
-    image: 'img/boson-social-card.jpg',
+    image: "img/boson-social-card.jpg",
     navbar: {
-      title: 'Boson',
+      title: "Boson",
       logo: {
-        alt: 'Boson Framework Logo',
-        src: 'img/logo.svg',
+        alt: "Boson Framework Logo",
+        src: "img/logo.svg",
       },
       items: [
         {
-          type: 'docSidebar',
-          sidebarId: 'tutorialSidebar',
-          position: 'left',
-          label: 'Documentation',
+          type: "docSidebar",
+          sidebarId: "tutorialSidebar",
+          position: "left",
+          label: "Documentation",
         },
-        {to: '/api', label: 'API Reference', position: 'left'},
-        {to: '/blog', label: 'Blog', position: 'left'},
         {
-          href: 'https://github.com/boson/boson-framework',
-          label: 'GitHub',
-          position: 'right',
+          href: "https://github.com/S1D007/boson",
+          label: "GitHub",
+          position: "right",
         },
       ],
     },
     footer: {
-      style: 'dark',
+      style: "light",
       links: [
         {
-          title: 'Docs',
+          title: "Docs",
           items: [
             {
-              label: 'Getting Started',
-              to: '/getting-started',
+              label: "Getting Started",
+              to: "/getting-started",
             },
             {
-              label: 'Core Concepts',
-              to: '/core-concepts',
-            },
-            {
-              label: 'API Reference',
-              to: '/api',
-            },
-          ],
-        },
-        {
-          title: 'Community',
-          items: [
-            {
-              label: 'Stack Overflow',
-              href: 'https://stackoverflow.com/questions/tagged/boson',
-            },
-            {
-              label: 'Discord',
-              href: 'https://discord.gg/boson-framework',
-            },
-            {
-              label: 'Twitter',
-              href: 'https://twitter.com/bosonframework',
-            },
-          ],
-        },
-        {
-          title: 'More',
-          items: [
-            {
-              label: 'Blog',
-              to: '/blog',
-            },
-            {
-              label: 'GitHub',
-              href: 'https://github.com/boson/boson-framework',
+              label: "Core Concepts",
+              to: "/core-concepts",
             },
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} Boson Framework. Built with Docusaurus.`,
+      copyright: `Copyright © ${new Date().getFullYear()} Boson Framework. Built with ❤️ by Siddhant in India(🇮🇳).`,
     },
     prism: {
       theme: prismThemes.github,
       darkTheme: prismThemes.dracula,
-      additionalLanguages: ['cpp', 'cmake', 'bash', 'json'],
+      additionalLanguages: ["cpp", "cmake", "bash", "json"],
     },
     algolia: {
-      appId: 'YOUR_APP_ID',
-      apiKey: 'YOUR_API_KEY',
-      indexName: 'boson',
+      appId: "YOUR_APP_ID",
+      apiKey: "YOUR_API_KEY",
+      indexName: "boson",
       contextualSearch: true,
     },
   } satisfies Preset.ThemeConfig,

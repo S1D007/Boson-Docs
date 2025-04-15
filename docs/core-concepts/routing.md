@@ -5,386 +5,266 @@ title: Routing
 
 # Routing in Boson
 
-The routing system is a fundamental component of Boson that maps HTTP requests to the appropriate handlers based on their URLs and methods. This guide explains how routing works in Boson and demonstrates various routing techniques.
+Routing is how you define the endpoints of your web application and specify how they respond to client requests. Boson makes routing simple and powerful, with support for path parameters, query parameters, and various HTTP methods.
 
-## Routing Basics
+## Basic Routes
 
-In Boson, routes define which code executes when a specific URL is requested. A route combines:
-- A URL pattern
-- An HTTP method (GET, POST, etc.)
-- A handler function or controller method
-
-## Defining Routes
-
-### Simple Route Definition
-
-The most basic way to define a route is with a lambda handler:
+Define routes using the HTTP method functions on your server instance:
 
 ```cpp
-#include <boson/boson.hpp>
+// Create a server instance
+boson::Server app;
 
-int main() {
-    boson::Application app;
-    
-    // Simple route with lambda handler
-    app.route("GET", "/hello", [](const boson::Request& request) -> boson::Response {
-        return boson::Response::ok("Hello, World!");
-    });
-    
-    // Method-specific shortcuts are also available
-    app.get("/hello", [](const boson::Request& request) {
-        return boson::Response::ok("Hello from GET!");
-    });
-    
-    app.post("/hello", [](const boson::Request& request) {
-        return boson::Response::ok("Hello from POST!");
-    });
-    
-    boson::Server server(app);
-    server.listen(8080);
-    return 0;
-}
+// Define a simple route
+app.get("/hello", [](const boson::Request& req, boson::Response& res) {
+    res.send("Hello, World!");
+});
+
+// Routes for different HTTP methods
+app.post("/users", [](const boson::Request& req, boson::Response& res) {
+    // Create a user...
+    res.status(201).send("User created");
+});
+
+app.put("/users/:id", [](const boson::Request& req, boson::Response& res) {
+    // Update a user...
+    res.send("User updated");
+});
+
+app.del("/users/:id", [](const boson::Request& req, boson::Response& res) {
+    // Delete a user...
+    res.send("User deleted");
+});
+
+app.patch("/users/:id", [](const boson::Request& req, boson::Response& res) {
+    // Partially update a user...
+    res.send("User patched");
+});
+
+app.head("/status", [](const boson::Request& req, boson::Response& res) {
+    // Headers only, no body
+    res.status(200).send();
+});
+
+app.options("/api", [](const boson::Request& req, boson::Response& res) {
+    // Respond to OPTIONS requests (commonly used for CORS)
+    res.header("Allow", "GET, POST, PUT, DELETE")
+       .status(200)
+       .send();
+});
 ```
 
-### Route Parameters
+## Route Parameters
 
-Routes can include parameters that extract values from the URL:
+You can define dynamic segments in your routes with parameters:
 
 ```cpp
-// Route with a named parameter
-app.get("/users/{id}", [](const boson::Request& request) {
+// Route with a parameter (note the : prefix)
+app.get("/users/:id", [](const boson::Request& req, boson::Response& res) {
     // Extract the parameter value
-    std::string userId = request.param("id");
-    return boson::Response::ok("User ID: " + userId);
+    std::string id = req.param("id");
+    
+    res.send("User ID: " + id);
 });
 
 // Multiple parameters
-app.get("/users/{userId}/posts/{postId}", [](const boson::Request& request) {
-    std::string userId = request.param("userId");
-    std::string postId = request.param("postId");
-    return boson::Response::ok("User " + userId + ", Post " + postId);
-});
-```
-
-### Type-Safe Parameters
-
-Boson supports automatic type conversion for route parameters:
-
-```cpp
-app.get("/users/{id}", [](const boson::Request& request) {
-    // Extract and convert to integer
-    int userId = request.param<int>("id");
+app.get("/posts/:year/:month/:slug", [](const boson::Request& req, boson::Response& res) {
+    std::string year = req.param("year");
+    std::string month = req.param("month");
+    std::string slug = req.param("slug");
     
-    // Will throw a boson::InvalidParameterException if conversion fails
-    return boson::Response::ok("User ID: " + std::to_string(userId));
+    res.send("Post from " + month + "/" + year + ": " + slug);
 });
 ```
 
-### Optional Parameters
+## Query Parameters
 
-You can define optional route parameters:
-
-```cpp
-// Optional segment parameter
-app.get("/products[/{category}]", [](const boson::Request& request) {
-    if (request.hasParam("category")) {
-        std::string category = request.param("category");
-        return boson::Response::ok("Products in category: " + category);
-    }
-    return boson::Response::ok("All products");
-});
-```
-
-### Route Constraints
-
-You can add constraints to route parameters to match specific patterns:
+Handle query string parameters in your routes:
 
 ```cpp
-// Constrain 'id' to digits only
-app.get("/users/{id:int}", [](const boson::Request& request) {
-    int userId = request.param<int>("id");
-    return boson::Response::ok("User ID: " + std::to_string(userId));
-});
-
-// Other built-in constraints
-app.get("/posts/{slug:alpha}", handlerFunction);        // Alphabetic characters only
-app.get("/files/{filename:alnum}", handlerFunction);    // Alphanumeric characters
-app.get("/users/{guid:uuid}", handlerFunction);         // UUID format
-app.get("/articles/{date:datetime}", handlerFunction);  // Date/time format
-```
-
-### Custom Constraints
-
-You can define custom parameter constraints using regular expressions:
-
-```cpp
-// Define a custom constraint using regex
-app.defineConstraint("zipcode", "^\\d{5}(-\\d{4})?$");
-
-// Use custom constraint in routes
-app.get("/locations/{zip:zipcode}", [](const boson::Request& request) {
-    std::string zipCode = request.param("zip");
-    return boson::Response::ok("Location: " + zipCode);
+// Route that handles query parameters (e.g., /search?q=boson&page=1)
+app.get("/search", [](const boson::Request& req, boson::Response& res) {
+    // Get a single query parameter
+    std::string query = req.query("q");
+    
+    // Get a query parameter with a default value
+    std::string page = req.query("page", "1");
+    
+    // Get all query parameters as a map
+    auto allParams = req.queryParams();
+    
+    res.send("Searching for: " + query + " on page " + page);
 });
 ```
 
 ## Route Groups
 
-Route groups help organize related routes and apply shared attributes:
+Group related routes together with routers:
 
 ```cpp
-// Create a route group
-auto apiGroup = app.group("/api");
+// Create a router for API routes
+boson::Router apiRouter;
 
-// Add routes to the group
-apiGroup->get("/users", getUsersHandler);
-apiGroup->post("/users", createUserHandler);
-apiGroup->get("/users/{id}", getUserByIdHandler);
-apiGroup->put("/users/{id}", updateUserHandler);
-apiGroup->del("/users/{id}", deleteUserHandler);  // 'delete' is a C++ keyword, so we use 'del'
+// Add routes to the router
+apiRouter.get("/users", [](const boson::Request& req, boson::Response& res) {
+    res.send("List of users");
+});
 
-// Nested groups
-auto v1Group = apiGroup->group("/v1");
-v1Group->get("/products", getProductsV1Handler);
+apiRouter.post("/users", [](const boson::Request& req, boson::Response& res) {
+    res.send("Create user");
+});
 
-auto v2Group = apiGroup->group("/v2");
-v2Group->get("/products", getProductsV2Handler);
+// Mount the router at a base path
+app.use("/api/v1", apiRouter);
+// These routes are now accessible at /api/v1/users
 ```
 
-## Route Middleware
+## Route Handlers
 
-You can apply middleware to specific routes or groups:
+A route handler is a function that is called when a request matches a route. There are several ways to define route handlers:
+
+### Lambda Functions
 
 ```cpp
-// Apply middleware to a single route
-app.get("/admin/dashboard", 
-    boson::middleware::auth(), 
-    [](const boson::Request& request) {
-        return boson::Response::ok("Admin Dashboard");
-    }
-);
-
-// Apply middleware to a group
-auto adminGroup = app.group("/admin", boson::middleware::auth());
-adminGroup->get("/users", adminGetUsersHandler);
-adminGroup->get("/settings", adminGetSettingsHandler);
+app.get("/hello", [](const boson::Request& req, boson::Response& res) {
+    res.send("Hello, World!");
+});
 ```
 
-## Named Routes
-
-You can name routes for easier URL generation:
+### Regular Functions
 
 ```cpp
-// Define a named route
-app.get("/users/{id}", userProfileHandler)
-    .name("user.profile");
-
-// Generate URLs using named routes in your handlers
-boson::Response showUserList(const boson::Request& request) {
-    // Generate URL for the "user.profile" route with parameter
-    std::string url = request.route("user.profile", {{"id", "123"}});
-    
-    // url will be "/users/123"
-    return boson::Response::ok("User profile URL: " + url);
+void handleHello(const boson::Request& req, boson::Response& res) {
+    res.send("Hello, World!");
 }
+
+// Use the function as a handler
+app.get("/hello", handleHello);
 ```
 
-## Domain and Subdomain Routing
-
-You can route based on domains or subdomains:
+### Class Methods
 
 ```cpp
-// Domain-specific route
-app.domain("api.example.com")->get("/users", apiGetUsersHandler);
+class UserController {
+public:
+    void getUsers(const boson::Request& req, boson::Response& res) {
+        res.send("List of users");
+    }
+};
 
-// Subdomain route with parameter
-app.domain("{tenant}.example.com")->get("/dashboard", [](const boson::Request& request) {
-    std::string tenant = request.param("tenant");
-    return boson::Response::ok(tenant + " Dashboard");
+UserController userController;
+app.get("/users", std::bind(&UserController::getUsers, userController, 
+                           std::placeholders::_1, std::placeholders::_2));
+
+// Or with a static method
+app.get("/users", &UserController::getUsers);
+```
+
+## Route Matching
+
+Boson matches routes in the order they are defined. When a request comes in, Boson tries to match it against each route until it finds a matching one. If no route matches, it responds with a 404 error.
+
+```cpp
+// This will match /users/profile
+app.get("/users/profile", [](const boson::Request& req, boson::Response& res) {
+    res.send("User profile");
+});
+
+// This will match /users/:id, but only if the previous route didn't match
+app.get("/users/:id", [](const boson::Request& req, boson::Response& res) {
+    res.send("User details");
+});
+
+// Catch-all route
+app.get("*", [](const boson::Request& req, boson::Response& res) {
+    res.status(404).send("Not Found");
 });
 ```
 
-## Method-based Routing
+## Route-Specific Middleware
 
-Boson supports all standard HTTP methods:
-
-```cpp
-app.get("/resource", getResourceHandler);
-app.post("/resource", createResourceHandler);
-app.put("/resource", updateResourceHandler);
-app.patch("/resource", patchResourceHandler);
-app.del("/resource", deleteResourceHandler);
-app.options("/resource", optionsResourceHandler);
-app.head("/resource", headResourceHandler);
-```
-
-### Method Spoofing
-
-For clients that don't support all HTTP methods (like HTML forms), you can use method spoofing:
+You can apply middleware to specific routes:
 
 ```cpp
-// Enable method spoofing in your application
-app.enableMethodSpoofing();
-```
+// Authentication middleware
+auto authenticate = [](const boson::Request& req, boson::Response& res, boson::NextFunction& next) {
+    std::string token = req.header("Authorization");
+    if (token.empty()) {
+        res.status(401).send("Unauthorized");
+        return;
+    }
+    // Authentication logic...
+    next();
+};
 
-With method spoofing enabled, clients can send a POST request with a `_method` field to simulate other HTTP methods:
-
-```html
-<form method="POST" action="/users/123">
-    <input type="hidden" name="_method" value="DELETE">
-    <button type="submit">Delete User</button>
-</form>
-```
-
-## Route Fallbacks
-
-You can define fallback routes for handling 404 errors:
-
-```cpp
-// Define a fallback route for unmatched URLs
-app.fallback([](const boson::Request& request) {
-    return boson::Response::notFound()
-        .body("<h1>Page not found</h1><p>The page you requested does not exist.</p>")
-        .contentType("text/html");
+// Apply middleware to a specific route
+app.get("/admin", authenticate, [](const boson::Request& req, boson::Response& res) {
+    res.send("Admin dashboard");
 });
+
+// Apply middleware to a router
+boson::Router adminRouter;
+adminRouter.use(authenticate);
+adminRouter.get("/dashboard", [](const boson::Request& req, boson::Response& res) {
+    res.send("Admin dashboard");
+});
+
+app.use("/admin", adminRouter);
 ```
 
-## Advanced Routing Techniques
+## Advanced Routing Patterns
 
-### Regex Routes
+### Version-Based Routing
 
-For complex matching patterns, you can use regular expression routes:
+Organize your API by versions:
 
 ```cpp
-// Route with regex pattern
-app.get(boson::Route::regex("/files/.*\\.pdf$"), [](const boson::Request& request) {
-    return boson::Response::ok("PDF file requested");
+// Create routers for different API versions
+boson::Router v1Router;
+boson::Router v2Router;
+
+v1Router.get("/users", [](const boson::Request& req, boson::Response& res) {
+    res.jsonObject({{"version", "v1"}, {"users", "[]"}});
 });
+
+v2Router.get("/users", [](const boson::Request& req, boson::Response& res) {
+    res.jsonObject({{"version", "v2"}, {"users", "[]"}, {"meta", {{"count", 0}}}});
+});
+
+// Mount the version routers
+app.use("/api/v1", v1Router);
+app.use("/api/v2", v2Router);
 ```
 
 ### Wildcard Routes
 
-Wildcards can capture entire path segments:
+Handle a group of routes with wildcard patterns:
 
 ```cpp
-// Wildcard route to capture all paths under /docs
-app.get("/docs/*path", [](const boson::Request& request) {
-    std::string path = request.param("path");
-    return boson::Response::ok("Documentation path: " + path);
+// Match any path under /files/
+app.get("/files/*", [](const boson::Request& req, boson::Response& res) {
+    std::string filePath = req.wildcard();
+    res.send("Requested file: " + filePath);
 });
 ```
 
-### Route Priority
+### Regular Expression Routes
 
-Routes have a default priority based on their specificity, but you can override it:
-
-```cpp
-// Increase priority (processed earlier)
-app.get("/users/{id}", userHandler).priority(10);
-
-// Decrease priority (processed later)
-app.get("/users/admins", adminHandler).priority(-5);
-```
-
-## Route Registration in Controllers
-
-In controller classes, routes are typically registered in the `registerRoutes` method:
+Some complex routing patterns can be achieved with regular expressions:
 
 ```cpp
-class UserController : public boson::Controller {
-public:
-    void registerRoutes() override {
-        // Register routes with their handlers
-        GET("/users", &UserController::index);
-        GET("/users/{id}", &UserController::show);
-        POST("/users", &UserController::create);
-        PUT("/users/{id}", &UserController::update);
-        DELETE("/users/{id}", &UserController::destroy);
-    }
-
-    // Handler methods
-    boson::Response index(const boson::Request& request);
-    boson::Response show(const boson::Request& request);
-    boson::Response create(const boson::Request& request);
-    boson::Response update(const boson::Request& request);
-    boson::Response destroy(const boson::Request& request);
-};
-
-// Register the controller with the application
-app.registerController<UserController>();
-```
-
-## Route Caching
-
-For applications with many routes, route caching can improve performance:
-
-```cpp
-// Enable route caching
-app.enableRouteCaching();
-
-// Manually cache routes (typically in production)
-app.cacheRoutes("cache/routes.cache");
-
-// Load cached routes
-app.loadRoutesFromCache("cache/routes.cache");
-```
-
-## Conditional Routes
-
-You can define routes with conditions:
-
-```cpp
-// Route that only matches during specific hours
-app.get("/store", [](const boson::Request& req) {
-    return boson::Response::ok("Store is open");
-})
-.where([](const boson::Request& req) {
-    auto now = std::chrono::system_clock::now();
-    auto time = std::chrono::system_clock::to_time_t(now);
-    auto tm = std::localtime(&time);
-    
-    // Only match during business hours (9am-5pm)
-    return tm->tm_hour >= 9 && tm->tm_hour < 17;
+// Match only numeric IDs
+app.get("/users/([0-9]+)", [](const boson::Request& req, boson::Response& res) {
+    std::string id = req.regexMatch(1);  // Get the first capture group
+    res.send("User with numeric ID: " + id);
 });
-```
-
-## Testing Routes
-
-Boson provides utilities for testing routes:
-
-```cpp
-#include <boson/testing/http_tester.hpp>
-
-// In your test function
-boson::HttpTester tester(app);
-
-// Test a GET request
-auto response = tester.get("/users/123");
-assert(response.statusCode() == 200);
-assert(response.json()["id"] == 123);
-
-// Test a POST request with JSON body
-auto createResponse = tester.post("/users")
-    .json({{"name", "John"}, {"email", "john@example.com"}})
-    .send();
-assert(createResponse.statusCode() == 201);
 ```
 
 ## Best Practices
 
-1. **Organize related routes** using route groups and controllers
-2. **Use descriptive route names** that reflect the resource and action
-3. **Follow REST conventions** for resource-based routes
-4. **Apply middleware at the appropriate level** (global, group, or route)
-5. **Use type-safe parameters** to avoid runtime type conversion errors
-6. **Implement proper error handling** for parameter validation failures
-7. **Cache routes in production** for improved performance
-8. **Test all routes** to ensure they behave as expected
-
-## Next Steps
-
-Now that you understand Boson's routing system, you can explore related topics:
-
-1. Learn about [Controllers](controllers.md) for organizing route handlers
-2. Understand [Middleware](middleware.md) for processing requests and responses
-3. Explore [Request and Response](request-response.md) objects in detail
+1. **Organize Routes Logically**: Group related routes under the same router
+2. **Use Descriptive Route Names**: Make routes self-descriptive
+3. **Follow REST Conventions**: Use appropriate HTTP methods
+4. **Parameter Validation**: Always validate route parameters
+5. **Keep Route Handlers Small**: Extract business logic to separate functions
+6. **Order Routes Properly**: Put more specific routes before general ones

@@ -364,7 +364,5 @@ Now that you've built a basic Boson application, you can:
 
 1. Explore the [Project Structure](project-structure.md) guide to understand best practices
 2. Learn about [Routing](../core-concepts/routing.md) in more depth
-3. Implement [Database Integration](../database/overview.md) in your application
-4. Add [Authentication and Authorization](../security/authentication.md)
 
 Congratulations on completing your first Boson application!

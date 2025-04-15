@@ -1,256 +1,192 @@
 ---
-sidebar_position: 3
+sidebar_position: 2
 title: Quickstart
 ---
 
 # Boson Quickstart Guide
 
-This quickstart guide will help you create your first Boson application in minutes. We'll build a simple REST API that responds with JSON data.
+This quickstart guide will help you create a simple but functional Boson application in just a few minutes. You'll build a RESTful API with JSON responses.
 
-## Step 1: Create a New Project
+## Step 1: Create a Project Structure
 
-First, let's create a new Boson project using the Boson CLI tool:
-
-```bash
-boson create api-example
-cd api-example
-```
-
-If you don't have the Boson CLI installed, you can manually set up a project:
-
-```bash
-mkdir api-example
-cd api-example
-```
-
-## Step 2: Set Up the Project Structure
-
-Create these files and directories to structure your application:
+First, create a directory for your project with the following structure:
 
 ```
-api-example/
+my-boson-app/
 ├── CMakeLists.txt
 ├── src/
-│   ├── main.cpp
-│   ├── controllers/
-│   │   └── user_controller.hpp
-│   └── models/
-│       └── user.hpp
-└── config/
-    └── app.json
+│   └── main.cpp
 ```
 
-## Step 3: Configure CMakeLists.txt
+## Step 2: Create CMakeLists.txt
 
 Create a `CMakeLists.txt` file in your project root:
 
 ```cmake
 cmake_minimum_required(VERSION 3.14)
-project(api-example VERSION 0.1.0)
+project(my-boson-app VERSION 0.1.0)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Find Boson package
 find_package(Boson REQUIRED)
 
+# Add executable
 add_executable(${PROJECT_NAME} src/main.cpp)
+
+# Link against Boson library
 target_link_libraries(${PROJECT_NAME} PRIVATE Boson::Boson)
-
-# Copy configuration files to build directory
-file(COPY ${CMAKE_SOURCE_DIR}/config DESTINATION ${CMAKE_BINARY_DIR})
 ```
 
-## Step 4: Define Your Model
+## Step 3: Create Your Application
 
-Create a simple User model in `src/models/user.hpp`:
-
-```cpp
-#pragma once
-
-#include <boson/model.hpp>
-#include <string>
-
-class User : public boson::Model {
-public:
-    User() = default;
-    User(int id, std::string name, std::string email)
-        : id_(id), name_(std::move(name)), email_(std::move(email)) {}
-
-    int id() const { return id_; }
-    const std::string& name() const { return name_; }
-    const std::string& email() const { return email_; }
-
-    // Serialization for JSON responses
-    boson::json::Object toJson() const override {
-        return {
-            {"id", id_},
-            {"name", name_},
-            {"email", email_}
-        };
-    }
-
-private:
-    int id_ = 0;
-    std::string name_;
-    std::string email_;
-};
-```
-
-## Step 5: Create a Controller
-
-Create a controller to handle user-related requests in `src/controllers/user_controller.hpp`:
-
-```cpp
-#pragma once
-
-#include <boson/controller.hpp>
-#include <boson/response.hpp>
-#include <vector>
-#include "../models/user.hpp"
-
-class UserController : public boson::Controller {
-public:
-    UserController() {
-        // Initialize with some sample data
-        users_.emplace_back(1, "Alice Smith", "alice@example.com");
-        users_.emplace_back(2, "Bob Johnson", "bob@example.com");
-        users_.emplace_back(3, "Carol Williams", "carol@example.com");
-    }
-
-    void registerRoutes() override {
-        // Define routes for this controller
-        GET("/users", &UserController::getAllUsers);
-        GET("/users/{id}", &UserController::getUserById);
-    }
-
-    // Handler for getting all users
-    boson::Response getAllUsers(const boson::Request& request) {
-        return boson::Response::json(users_);
-    }
-
-    // Handler for getting a user by ID
-    boson::Response getUserById(const boson::Request& request) {
-        auto id = request.param<int>("id");
-        
-        for (const auto& user : users_) {
-            if (user.id() == id) {
-                return boson::Response::json(user);
-            }
-        }
-
-        return boson::Response::notFound()
-            .json({{"error", "User not found"}});
-    }
-
-private:
-    std::vector<User> users_;
-};
-```
-
-## Step 6: Set Up the Application
-
-Create the main application file at `src/main.cpp`:
+In `src/main.cpp`, create a simple API server:
 
 ```cpp
 #include <boson/boson.hpp>
-#include <boson/server.hpp>
 #include <iostream>
-#include "controllers/user_controller.hpp"
+#include <vector>
+#include <string>
+
+// A simple user model
+struct User {
+    int id;
+    std::string name;
+    std::string email;
+    
+    // Convert to JSON object using nlohmann::json library
+    nlohmann::json toJson() const {
+        return {
+            {"id", id},
+            {"name", name},
+            {"email", email}
+        };
+    }
+};
+
+// Our in-memory "database"
+std::vector<User> users = {
+    {1, "John Doe", "john@example.com"},
+    {2, "Jane Smith", "jane@example.com"}
+};
 
 int main() {
-    try {
-        // Create the application
-        boson::Application app;
+    // Initialize framework
+    boson::initialize();
+    
+    // Create server instance
+    boson::Server app;
+    
+    // Add logging middleware
+    app.use([](const boson::Request& req, boson::Response& res, boson::NextFunction& next) {
+        std::cout << "[" << req.method() << "] " << req.path() << std::endl;
+        next();
+    });
+    
+    // Define routes
+    
+    // GET /
+    app.get("/", [](const boson::Request& req, boson::Response& res) {
+        res.send("Welcome to the Boson API!");
+    });
+    
+    // GET /api/users - Get all users
+    app.get("/api/users", [](const boson::Request& req, boson::Response& res) {
+        nlohmann::json usersJson = nlohmann::json::array();
         
-        // Load configuration
-        app.loadConfig("config/app.json");
+        for (const auto& user : users) {
+            usersJson.push_back(user.toJson());
+        }
         
-        // Register controllers
-        app.registerController<UserController>();
+        nlohmann::json response = {
+            {"users", usersJson},
+            {"count", users.size()}
+        };
         
-        // Create and start the server
-        boson::Server server(app);
-        std::cout << "Server running at http://127.0.0.1:8080" << std::endl;
-        server.listen(8080);
-        
-        return 0;
-    } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
-        return 1;
-    }
+        res.jsonObject(response);
+    });
+    
+    // GET /api/users/:id - Get user by ID
+    app.get("/api/users/:id", [](const boson::Request& req, boson::Response& res) {
+        try {
+            int id = std::stoi(req.param("id"));
+            
+            for (const auto& user : users) {
+                if (user.id == id) {
+                    res.jsonObject(user.toJson());
+                    return;
+                }
+            }
+            
+            // User not found
+            res.status(404).jsonObject({
+                {"error", "User not found"},
+                {"id", id}
+            });
+        }
+        catch (const std::exception& e) {
+            res.status(400).jsonObject({
+                {"error", "Invalid ID format"},
+                {"message", e.what()}
+            });
+        }
+    });
+    
+    // Configure the server
+    std::cout << "Starting server on http://127.0.0.1:3000" << std::endl;
+    app.configure(3000, "127.0.0.1");
+    
+    // Start the server
+    return app.listen();
 }
 ```
 
-## Step 7: Create a Configuration File
-
-Create a basic configuration in `config/app.json`:
-
-```json
-{
-  "app": {
-    "name": "Boson API Example",
-    "environment": "development",
-    "debug": true
-  },
-  "server": {
-    "host": "127.0.0.1",
-    "port": 8080,
-    "workers": 4
-  },
-  "logging": {
-    "level": "debug",
-    "file": "logs/app.log"
-  }
-}
-```
-
-## Step 8: Build and Run
-
-Build your application:
+## Step 4: Build Your Application
 
 ```bash
+# Create build directory
 mkdir build && cd build
+
+# Configure with CMake
 cmake ..
+
+# Build
 cmake --build .
 ```
 
-Run your application:
+## Step 5: Run Your Application
 
 ```bash
-./api-example
+# Run from the build directory
+./my-boson-app
 ```
 
-## Step 9: Test Your API
-
-Open a browser or use curl to test your API endpoints:
+Your server should start on port 3000. You can now test your API with curl:
 
 ```bash
+# Get the welcome message
+curl http://localhost:3000/
+
 # Get all users
-curl http://127.0.0.1:8080/users
+curl http://localhost:3000/api/users
 
-# Get user by ID
-curl http://127.0.0.1:8080/users/1
+# Get a specific user
+curl http://localhost:3000/api/users/1
 ```
 
-You should see JSON responses with user data!
+## Step 6: Extend Your API
+
+Now that you have a working application, try extending it with:
+
+- A POST endpoint to create new users
+- A PUT endpoint to update users
+- A DELETE endpoint to remove users
 
 ## Next Steps
 
-Now that you've created your first Boson application, you can:
+Congratulations on creating your first Boson application! To learn more about organizing your code and building more complex applications:
 
-1. Add more routes and controllers
-2. Connect to a database using Boson's database adapters
-3. Implement authentication middleware
-4. Explore more advanced features in the [Core Concepts](../core-concepts/server.md) section
-
-For a more detailed walkthrough, continue to the [Hello World](hello-world.md) tutorial, which explores each component in greater depth.
-
-## Troubleshooting
-
-### Common Issues
-
-- **Compilation errors**: Ensure your compiler fully supports C++17
-- **Runtime errors**: Check your configuration file syntax
-- **Missing headers**: Verify Boson is correctly installed and CMake can find it
-
-If you encounter problems, refer to the [Troubleshooting](../advanced/troubleshooting.md) guide or open an issue on our GitHub repository.
+- Check out the [Project Structure](project-structure) guide
+- Explore [Core Concepts](../core-concepts/server) like routing and middleware
+- See more [Examples](../examples/rest-api) for inspiration
