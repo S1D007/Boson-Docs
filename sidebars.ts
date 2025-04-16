@@ -31,6 +31,7 @@ const sidebars: SidebarsConfig = {
       items: [
         'getting-started/installation',
         'getting-started/prerequisites',
+        'getting-started/using-cli',
         'getting-started/quickstart',
         'getting-started/hello-world',
         'getting-started/project-structure',
