@@ -29,6 +29,21 @@ This script will:
 - Install it to `~/.local/bin` (or another directory in your PATH)
 - Set up auto-update so you always have the latest version
 
+You can install the Boson CLI on Windows using PowerShell with this one-liner:
+
+```powershell
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/S1D007/boson/main/install.ps1 -UseBasicParsing | Invoke-Expression
+```
+
+This script will:
+
+- Download the latest Boson CLI release for Windows
+- Install it to `%USERPROFILE%\.boson\bin`
+- Add the install path to your system `PATH`
+- Set up auto-update so the CLI always stays current
+
+> ℹ️ **Note:** You may need to restart your terminal after installation for the `boson` command to be recognized.
+
 ## Verifying Installation
 
 After installation, open a new terminal and run:
@@ -43,6 +58,20 @@ You should see the Boson CLI help output. You can also check the version:
 boson version
 ```
 
+### Verifying Installation on Windows
+
+After installation, open a new PowerShell window and run:
+
+```powershell
+boson --help
+```
+
+You should see the CLI help menu. To check the installed version:
+
+```powershell
+boson version
+```
+
 ## Keeping Boson Up to Date
 
 The installer automatically sets up auto-update for the CLI. Every time you open a new shell, the CLI will check for updates and install the latest version if available.
@@ -53,13 +82,32 @@ You can also update manually at any time:
 boson update
 ```
 
+### Manual Update
+
+If you want to trigger a manual update:
+
+```powershell
+boson update
+```
+
+---
 ## Uninstalling
 
-To remove the Boson CLI, simply delete the installed files:
+### macOS/Linux
+To remove the Boson CLI on macOS or Linux, simply delete the installed files:
 
 ```bash
 rm -rf ~/.local/bin/boson ~/.boson
 ```
+
+### Windows
+To remove the Boson CLI on Windows, run these commands in PowerShell:
+
+```powershell
+Remove-Item -Recurse -Force "$env:USERPROFILE\.boson"
+```
+
+You may also want to remove the installation directory from your PATH environment variable.
 
 ---
 
